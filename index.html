@@ -87,6 +87,42 @@
             color: #fff;
         }
         .btn-reset:hover { background: #c0392b; }
+
+        .dpad {
+            display: none;
+            margin-top: 12px;
+            touch-action: none;
+        }
+        .dpad-row {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+        }
+        .dpad-btn {
+            width: 64px;
+            height: 64px;
+            border: none;
+            border-radius: 16px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 28px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            transition: background 0.1s;
+        }
+        .dpad-btn:active { background: rgba(255,255,255,0.25); }
+        .dpad-space { width: 64px; }
+
+        @media (pointer: coarse) {
+            .dpad { display: block; }
+            .hint { display: none; }
+        }
+
         .hint {
             color: rgba(255,255,255,0.3);
             font-size: 12px;
@@ -118,7 +154,19 @@
         <button class="btn-start" id="btnStart">▶ 開始遊戲</button>
         <button class="btn-reset" id="btnReset">↻ 重新開始</button>
     </div>
-    <div class="hint">方向鍵 ↑↓←→ 移動青蛙</div>
+    <div class="dpad">
+        <div class="dpad-row">
+            <div class="dpad-space"></div>
+            <button class="dpad-btn" data-dir="up">▲</button>
+            <div class="dpad-space"></div>
+        </div>
+        <div class="dpad-row">
+            <button class="dpad-btn" data-dir="left">◀</button>
+            <button class="dpad-btn" data-dir="down">▼</button>
+            <button class="dpad-btn" data-dir="right">▶</button>
+        </div>
+    </div>
+    <div class="hint">方向鍵 / 滑動畫面 移動青蛙</div>
     <div class="github-link">
         <a href="https://github.com/bolprinter5fb-web/202606022" target="_blank">GitHub</a>
     </div>
@@ -528,6 +576,46 @@
         else if (e.key === 'ArrowLeft') moveFrog(-1, 0);
         else if (e.key === 'ArrowRight') moveFrog(1, 0);
     });
+
+    document.querySelectorAll('.dpad-btn').forEach(btn => {
+        const dir = btn.dataset.dir;
+        const map = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+        btn.addEventListener('touchstart', e => {
+            e.preventDefault();
+            const [dx, dy] = map[dir];
+            moveFrog(dx, dy);
+        });
+        btn.addEventListener('mousedown', e => {
+            e.preventDefault();
+            const [dx, dy] = map[dir];
+            moveFrog(dx, dy);
+        });
+    });
+
+    let touchX = 0, touchY = 0;
+    canvas.addEventListener('touchstart', e => {
+        e.preventDefault();
+        const t = e.touches[0];
+        touchX = t.clientX;
+        touchY = t.clientY;
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', e => {
+        e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', e => {
+        e.preventDefault();
+        const t = e.changedTouches[0];
+        const dx = t.clientX - touchX;
+        const dy = t.clientY - touchY;
+        if (Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
+        if (Math.abs(dx) > Math.abs(dy)) {
+            moveFrog(dx > 0 ? 1 : -1, 0);
+        } else {
+            moveFrog(0, dy > 0 ? 1 : -1);
+        }
+    }, { passive: false });
 
     document.getElementById('btnStart').addEventListener('click', () => {
         if (gameOver) { init(); }
