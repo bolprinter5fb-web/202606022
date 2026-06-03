@@ -73,9 +73,22 @@ async function primeAudio(){
   _DEATH=bA(mT([[330,.15,'sq'],[262,.15,'sq'],[198,.2,'sq'],[132,.3,'sq']]));
   _GODTH=bA(mT([[264,.08,'sq'],[330,.08,'sq'],[396,.08,'sq'],[528,.12,'sq']]));
   _EYE=bA(mT([[528,.06,'si'],[396,.06,'si']]));
-  const bm=t(264,.06,'sq'),bmA=[];
-  for(let i=0;i<32;i++){bmA.push(bm[i]);bmA.push(bm[i]);bmA.push(bm[i])}
-  _BGM=bA(new Float32Array(bmA));
+  // Pac-Man style BGM melody
+  const bgmMelody = [
+    [330,.12,'sq'],[330,.12,'sq'],[262,.12,'sq'],[330,.12,'sq'],[392,.24,'sq'],[262,.24,'sq'],
+    [330,.12,'sq'],[330,.12,'sq'],[262,.12,'sq'],[330,.12,'sq'],[440,.24,'sq'],[262,.24,'sq'],
+    [330,.12,'sq'],[330,.12,'sq'],[262,.12,'sq'],[330,.12,'sq'],[392,.12,'sq'],[330,.12,'sq'],[294,.24,'sq'],[262,.12,'sq'],
+    [294,.12,'sq'],[262,.12,'sq'],[247,.12,'sq'],[220,.12,'sq'],[196,.12,'sq'],[165,.24,'sq'],
+  ];
+  const bgmArr = new Float32Array(Math.floor(sr * bgmMelody.reduce((s,[_,d])=>s+d,0)));
+  let off=0;
+  for(const [freq,dur,type] of bgmMelody){
+    const samples=Math.floor(sr*dur);
+    const tone=t(freq,dur,type||'sq');
+    for(let i=0;i<samples&&i<tone.length&&off+i<bgmArr.length;i++)bgmArr[off+i]=tone[i];
+    off+=samples;
+  }
+  _BGM=bA(bgmArr);
   audioReady=true;
 }
 function pB(buf,v){if(!audioReady)return;try{const s=ac().createBufferSource(),g=ac().createGain();g.gain.value=v||.12;s.buffer=buf;s.connect(g);g.connect(ac().destination);s.start()}catch(_){}}
