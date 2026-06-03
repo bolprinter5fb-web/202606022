@@ -202,14 +202,34 @@
     let musicPlaying = false;
     let musicOn = true;
     let bgmInterval = null;
+    let audioUnlocked = false;
+
+    function initAudio() {
+        if (audioCtx) return;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        musicGain = audioCtx.createGain();
+        musicGain.gain.value = 0.08;
+        musicGain.connect(audioCtx.destination);
+    }
+
+    async function unlockAudio() {
+        if (audioUnlocked) return;
+        initAudio();
+        if (audioCtx.state === 'suspended') {
+            try { await audioCtx.resume(); } catch (_) {}
+        }
+        audioUnlocked = true;
+    }
+
+    function setupAudioUnlock() {
+        const handler = () => { unlockAudio(); };
+        document.addEventListener('touchstart', handler, { once: true });
+        document.addEventListener('mousedown', handler, { once: true });
+        document.addEventListener('click', handler, { once: true });
+    }
 
     function getAudioCtx() {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            musicGain = audioCtx.createGain();
-            musicGain.gain.value = 0.08;
-            musicGain.connect(audioCtx.destination);
-        }
+        initAudio();
         if (audioCtx.state === 'suspended') audioCtx.resume();
         return audioCtx;
     }
@@ -779,6 +799,8 @@
     }
 
     // Input
+    setupAudioUnlock();
+
     document.addEventListener('keydown', e => {
         if (e.key.startsWith('Arrow')) e.preventDefault();
         const map = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
@@ -811,7 +833,8 @@
     }, { passive: false });
     canvas.addEventListener('touchcancel', e => { touchId = null; }, { passive: false });
 
-    document.getElementById('btnStart').addEventListener('click', () => {
+    document.getElementById('btnStart').addEventListener('click', async () => {
+        await unlockAudio();
         if (gameOver) init();
         running = true;
         if (musicOn) playBGM();
