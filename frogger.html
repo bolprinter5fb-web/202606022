@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>???眾 Frogger</title>
+    <title>青蛙過河 Frogger</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -145,33 +145,33 @@
 <body>
 <div class="container">
     <div class="header">
-        <h1>? ???眾</h1>
+        <h1>🐸 青蛙過河</h1>
         <div class="stats">
-            <div><div class="label">?</div><div class="value" id="score">0</div></div>
-            <div><div class="label">?</div><div class="value" id="lives">3</div></div>
-            <div><div class="label">?</div><div class="value" id="level">1</div></div>
+            <div><div class="label">分數</div><div class="value" id="score">0</div></div>
+            <div><div class="label">生命</div><div class="value" id="lives">3</div></div>
+            <div><div class="label">關卡</div><div class="value" id="level">1</div></div>
         </div>
     </div>
     <canvas id="game" width="500" height="580"></canvas>
     <div class="high-score" id="highScore"></div>
     <div class="controls">
-        <button class="btn-start" id="btnStart">????</button>
-        <button class="btn-music" id="btnMusic">?</button>
-        <button class="btn-reset" id="btnReset">????</button>
+        <button class="btn-start" id="btnStart">▶ 開始</button>
+        <button class="btn-music" id="btnMusic">🎵</button>
+        <button class="btn-reset" id="btnReset">↻ 重來</button>
     </div>
     <div class="dpad">
         <div class="dpad-row">
             <div class="dpad-space"></div>
-            <button class="dpad-btn" data-dir="up">??/button>
+            <button class="dpad-btn" data-dir="up">▲</button>
             <div class="dpad-space"></div>
         </div>
         <div class="dpad-row">
-            <button class="dpad-btn" data-dir="left">?</button>
-            <button class="dpad-btn" data-dir="down">??/button>
-            <button class="dpad-btn" data-dir="right">??/button>
+            <button class="dpad-btn" data-dir="left">◀</button>
+            <button class="dpad-btn" data-dir="down">▼</button>
+            <button class="dpad-btn" data-dir="right">▶</button>
         </div>
     </div>
-    <div class="hint">?孵???/ 皛??恍 蝘餃???</div>
+    <div class="hint">方向鍵 / 滑動畫面 移動青蛙</div>
     <div class="github-link">
         <a href="index.html">🏠 回首頁</a> · <a href="https://github.com/bolprinter5fb-web/202606022" target="_blank">GitHub</a>
     </div>
@@ -333,7 +333,7 @@
 
     function toggleMusic() {
         musicOn = !musicOn;
-        document.getElementById('btnMusic').textContent = musicOn ? '?' : '??';
+        document.getElementById('btnMusic').textContent = musicOn ? '🎵' : '🔇';
         document.getElementById('btnMusic').classList.toggle('muted', !musicOn);
         if (musicOn && running) playBGM();
         else stopBGM();
@@ -357,7 +357,7 @@
     }
 
     function spawnStars(y) {
-        const emojis = ['潃?, '??', '??, '??', '??'];
+        const emojis = ['⭐', '🌟', '✨', '🎉', '🎊'];
         for (let i = 0; i < 10; i++) {
             const angle = Math.random() * Math.PI * 2;
             const speed = 1 + Math.random() * 2;
@@ -385,7 +385,7 @@
         obstacles = [];
         logs = [];
         particles = [];
-        highScoreEl.textContent = highScore > 0 ? '?? ?擃?: ' + highScore : '';
+        highScoreEl.textContent = highScore > 0 ? '🏆 最高分: ' + highScore : '';
         generateLevel();
         updateUI();
         draw();
@@ -397,11 +397,11 @@
         const speed = 0.5 + level * 0.3;
 
         const carTypes = [
-            { color: '#e74c3c', label: '??', w: 1.5 },
-            { color: '#f39c12', label: '??', w: 1.8 },
-            { color: '#3498db', label: '??', w: 1.5 },
-            { color: '#9b59b6', label: '??', w: 2 },
-            { color: '#e67e22', label: '??', w: 2.5 },
+            { color: '#e74c3c', label: '🚗', w: 1.5 },
+            { color: '#f39c12', label: '🚙', w: 1.8 },
+            { color: '#3498db', label: '🚕', w: 1.5 },
+            { color: '#9b59b6', label: '🚐', w: 2 },
+            { color: '#e67e22', label: '🚚', w: 2.5 },
         ];
 
         ROAD_ROWS.forEach((row, i) => {
@@ -514,7 +514,7 @@
             if (score > highScore) {
                 highScore = score;
                 localStorage.setItem('frogger_high', String(highScore));
-                highScoreEl.textContent = '?? ?擃?: ' + highScore;
+                highScoreEl.textContent = '🏆 最高分: ' + highScore;
             }
         } else {
             resetFrog();
@@ -598,21 +598,21 @@
             ctx.font = 'bold 44px Segoe UI, Arial, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('?? ?蝯?', 250, 220);
+            ctx.fillText('💀 遊戲結束', 250, 220);
 
             ctx.fillStyle = '#fff';
             ctx.font = '28px Segoe UI, Arial, sans-serif';
-            ctx.fillText('?: ' + score, 250, 290);
+            ctx.fillText('分數: ' + score, 250, 290);
 
             if (score >= highScore && score > 0) {
                 ctx.fillStyle = '#ffd700';
                 ctx.font = 'bold 22px Segoe UI, Arial, sans-serif';
-                ctx.fillText('?? ?啁???', 250, 340);
+                ctx.fillText('🎉 新紀錄！', 250, 340);
             }
 
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
             ctx.font = '16px Segoe UI, Arial, sans-serif';
-            ctx.fillText('??憪??唳???, 250, 400);
+            ctx.fillText('按「開始」重新挑戰', 250, 400);
         } else if (!running) {
             ctx.fillStyle = 'rgba(0,0,0,0.45)';
             ctx.fillRect(0, 0, 500, 580);
@@ -620,10 +620,10 @@
             ctx.font = 'bold 32px Segoe UI, Arial, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('? ???眾', 250, 250);
+            ctx.fillText('🐸 青蛙過河', 250, 250);
             ctx.font = '18px Segoe UI, Arial, sans-serif';
             ctx.fillStyle = 'rgba(255,255,255,0.6)';
-            ctx.fillText('??憪脣?', 250, 310);
+            ctx.fillText('按「開始」進入遊戲', 250, 310);
         }
     }
 
@@ -741,7 +741,7 @@
                 ctx.font = '22px Arial';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'top';
-                ctx.fillText('??', x + CELL / 2, 2);
+                ctx.fillText('🏠', x + CELL / 2, 2);
             }
         }
     }
