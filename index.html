@@ -196,137 +196,140 @@
     const ROAD_ROWS = [4, 5, 6, 7, 8];
     const RIVER_ROWS = [9, 10, 11, 12];
 
-    // Audio
+    // Audio - uses AudioBuffer (PCM) synthesis for iOS compatibility
     let audioCtx = null;
     let musicGain = null;
     let musicPlaying = false;
     let musicOn = true;
-    let bgmInterval = null;
+    let bgmSource = null;
     let audioReady = false;
 
-    function ensureAudio() {
-        if (audioCtx) return audioCtx;
-        const Ctor = window.AudioContext || window.webkitAudioContext;
-        audioCtx = new Ctor();
-        musicGain = audioCtx.createGain();
-        musicGain.gain.value = 0.06;
-        musicGain.connect(audioCtx.destination);
+    // Pre-rendered sound buffers
+    let _BGM, _HIT, _LEVELUP, _GAMEOVER, _JUMP;
+
+    function ensureCtx() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         return audioCtx;
     }
 
-    function primeAudio() {
-        if (audioReady) return;
-        const ctx = ensureAudio();
-        if (ctx.state === 'suspended') ctx.resume();
-        try {
-            const buf = ctx.createBuffer(1, ctx.sampleRate * 0.05, ctx.sampleRate);
-            const data = buf.getChannelData(0);
-            for (let i = 0; i < data.length; i++) data[i] = Math.sin(2 * Math.PI * 440 * i / ctx.sampleRate) * 0.0001;
-            const src = ctx.createBufferSource();
-            src.buffer = buf;
-            src.connect(ctx.destination);
-            src.start();
-        } catch (_) {}
-        audioReady = true;
+    function renderTone(sr, freq, dur, type) {
+        const len = Math.floor(sr * dur);
+        const b = new Float32Array(len);
+        for (let i = 0; i < len; i++) {
+            const t = i / sr, env = Math.max(0, 1 - i / len);
+            let v = 0;
+            if (freq > 0) {
+                if (type === 'sine') v = Math.sin(2 * Math.PI * freq * t);
+                else if (type === 'saw') v = 2 * (freq * t % 1) - 1;
+                else if (type === 'tri') { const p = 2 * (freq * t % 1) - 1; v = 2 * Math.abs(p) - 1; }
+                else v = Math.sin(2 * Math.PI * freq * t) > 0 ? 1 : -1;
+            }
+            b[i] = v * env * 0.3;
+        }
+        return b;
     }
 
-    function createToneBuffer(freq, dur, type) {
-        const ctx = ensureAudio();
-        const sr = ctx.sampleRate;
-        const len = Math.floor(sr * dur);
-        const buf = ctx.createBuffer(1, len, sr);
-        const d = buf.getChannelData(0);
-        for (let i = 0; i < len; i++) {
-            const t = i / sr;
-            const env = Math.max(0, 1 - i / len);
-            let v = 0;
-            if (type === 'sine') v = Math.sin(2 * Math.PI * freq * t);
-            else if (type === 'square') v = Math.sin(2 * Math.PI * freq * t) > 0 ? 1 : -1;
-            else if (type === 'sawtooth') v = 2 * (freq * t % 1) - 1;
-            else if (type === 'triangle') { const p = 2 * (freq * t % 1) - 1; v = 2 * Math.abs(p) - 1; }
-            else v = Math.sin(2 * Math.PI * freq * t);
-            d[i] = v * env * 0.3;
+    function renderMelody(sr, notes) {
+        let total = 0;
+        for (const [_, d] of notes) total += d;
+        const len = Math.floor(sr * total);
+        const b = new Float32Array(len);
+        let off = 0;
+        for (const [freq, dur] of notes) {
+            const samples = Math.floor(sr * dur);
+            const tone = renderTone(sr, freq, dur * 0.9, 'tri');
+            for (let i = 0; i < samples && i < tone.length && off + i < len; i++) b[off + i] = tone[i];
+            off += samples;
         }
+        return b;
+    }
+
+    function renderMulti(sr, notes) {
+        let total = 0;
+        for (const [_, d] of notes) total += d;
+        const len = Math.floor(sr * total);
+        const b = new Float32Array(len);
+        let off = 0;
+        for (const [freq, dur, type] of notes) {
+            const samples = Math.floor(sr * dur);
+            const tone = renderTone(sr, freq, dur, type);
+            for (let i = 0; i < samples && i < tone.length && off + i < len; i++) b[off + i] = tone[i];
+            off += samples;
+        }
+        return b;
+    }
+
+    function bufferFromArray(sr, arr) {
+        const buf = audioCtx.createBuffer(1, arr.length, sr);
+        buf.getChannelData(0).set(arr);
         return buf;
     }
 
+    async function primeAudio() {
+        if (audioReady) return;
+        const ctx = ensureCtx();
+        if (ctx.state === 'suspended') await ctx.resume();
+        const sr = ctx.sampleRate;
+
+        musicGain = ctx.createGain();
+        musicGain.gain.value = 0.06;
+        musicGain.connect(ctx.destination);
+
+        // Pre-render BGM (entire melody as one buffer, looped natively)
+        const bgmNotes = [
+            [262, 0.2], [294, 0.2], [330, 0.2], [349, 0.2],
+            [392, 0.3], [392, 0.1], [349, 0.2], [330, 0.2],
+            [294, 0.3], [262, 0.2], [294, 0.2], [330, 0.2],
+            [262, 0.4],
+            [330, 0.2], [349, 0.2], [392, 0.2], [440, 0.2],
+            [392, 0.3], [349, 0.2], [330, 0.2], [294, 0.2],
+            [262, 0.3], [294, 0.2], [330, 0.2], [349, 0.2],
+            [262, 0.4],
+        ];
+        _BGM = bufferFromArray(sr, renderMelody(sr, bgmNotes));
+
+        // Pre-render SFX (each is one contiguous buffer)
+        _HIT = bufferFromArray(sr, renderMulti(sr, [[200, 0.15, 'saw'], [150, 0.25, 'saw']]));
+        _LEVELUP = bufferFromArray(sr, renderMulti(sr, [[523, 0.2, 'tri'], [587, 0.2, 'tri'], [659, 0.2, 'tri'], [784, 0.2, 'tri'], [1047, 0.3, 'tri']]));
+        _GAMEOVER = bufferFromArray(sr, renderMulti(sr, [[392, 0.25, 'saw'], [349, 0.25, 'saw'], [330, 0.25, 'saw'], [262, 0.3, 'saw'], [196, 0.35, 'saw'], [131, 0.4, 'saw']]));
+        _JUMP = bufferFromArray(sr, renderTone(sr, 660, 0.06, 'sine'));
+
+        audioReady = true;
+    }
+
     function playBuf(buf, vol) {
+        if (!audioReady) return;
         try {
-            const ctx = ensureAudio();
-            const src = ctx.createBufferSource();
-            const g = ctx.createGain();
+            const src = audioCtx.createBufferSource();
+            const g = audioCtx.createGain();
             g.gain.value = vol || 0.12;
             src.buffer = buf;
             src.connect(g);
-            g.connect(ctx.destination);
-            src.start();
-        } catch (_) {}
-    }
-
-    function playNote(freq, dur, type, dest) {
-        try {
-            const buf = createToneBuffer(freq, dur, type || 'square');
-            const ctx = ensureAudio();
-            const src = ctx.createBufferSource();
-            const g = ctx.createGain();
-            g.gain.value = 0.12;
-            src.buffer = buf;
-            src.connect(g);
-            g.connect(dest || ctx.destination);
+            g.connect(audioCtx.destination);
             src.start();
         } catch (_) {}
     }
 
     function playBGM() {
-        if (!musicOn) return;
-        if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; }
-        const melody = [
-            [262, 0.2], [294, 0.2], [330, 0.2], [349, 0.2],
-            [392, 0.3], [392, 0.1], [349, 0.2], [330, 0.2],
-            [294, 0.3], [262, 0.2], [294, 0.2], [330, 0.2],
-            [262, 0.4], [0, 0.2],
-            [330, 0.2], [349, 0.2], [392, 0.2], [440, 0.2],
-            [392, 0.3], [349, 0.2], [330, 0.2], [294, 0.2],
-            [262, 0.3], [294, 0.2], [330, 0.2], [349, 0.2],
-            [262, 0.4], [0, 0.2],
-        ];
-        let i = 0;
+        if (!musicOn || !audioReady) return;
+        stopBGM();
+        bgmSource = audioCtx.createBufferSource();
+        bgmSource.buffer = _BGM;
+        bgmSource.loop = true;
+        bgmSource.connect(musicGain);
+        bgmSource.start();
         musicPlaying = true;
-        function playNext() {
-            if (!musicPlaying || !musicOn) return;
-            const [freq, dur] = melody[i % melody.length];
-            if (freq > 0) playNote(freq, dur * 0.9, 'triangle', musicGain);
-            i++;
-            bgmInterval = setTimeout(playNext, dur * 1000);
-        }
-        playNext();
     }
 
     function stopBGM() {
+        if (bgmSource) { try { bgmSource.stop(); bgmSource.disconnect(); } catch (_) {} bgmSource = null; }
         musicPlaying = false;
-        if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; }
     }
 
-    function playHitSound() {
-        playBuf(createToneBuffer(200, 0.15, 'sawtooth'), 0.15);
-        setTimeout(() => playBuf(createToneBuffer(150, 0.25, 'sawtooth'), 0.15), 100);
-    }
-
-    function playLevelUpSound() {
-        [523, 587, 659, 784, 1047].forEach((f, i) => {
-            setTimeout(() => playBuf(createToneBuffer(f, 0.2, 'triangle'), 0.15), i * 100);
-        });
-    }
-
-    function playGameOverSound() {
-        [392, 349, 330, 262, 196, 131].forEach((f, i) => {
-            setTimeout(() => playBuf(createToneBuffer(f, 0.3, 'sawtooth'), 0.15), i * 150);
-        });
-    }
-
-    function playJumpSound() {
-        playBuf(createToneBuffer(660, 0.06, 'sine'), 0.08);
-    }
+    function playHitSound() { playBuf(_HIT, 0.15); }
+    function playLevelUpSound() { playBuf(_LEVELUP, 0.15); }
+    function playGameOverSound() { playBuf(_GAMEOVER, 0.15); }
+    function playJumpSound() { playBuf(_JUMP, 0.08); }
 
     function toggleMusic() {
         musicOn = !musicOn;
@@ -822,11 +825,10 @@
     }
 
     // Input
-    (function setupAudioOnInteraction() {
-        const fn = () => { primeAudio(); };
+    (function setupAudioUnlock() {
+        const fn = () => { if (!audioCtx) ensureCtx(); };
         document.addEventListener('touchstart', fn, { once: true });
         document.addEventListener('mousedown', fn, { once: true });
-        document.addEventListener('click', fn, { once: true });
     })();
 
     document.addEventListener('keydown', e => {
@@ -861,8 +863,8 @@
     }, { passive: false });
     canvas.addEventListener('touchcancel', e => { touchId = null; }, { passive: false });
 
-    document.getElementById('btnStart').addEventListener('click', () => {
-        primeAudio();
+    document.getElementById('btnStart').addEventListener('click', async () => {
+        await primeAudio();
         if (gameOver) init();
         running = true;
         if (musicOn) playBGM();
